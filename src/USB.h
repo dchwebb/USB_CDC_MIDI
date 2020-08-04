@@ -117,7 +117,7 @@ extern uint16_t usbEventNo;
 #define CDC_OUT_EP						0x01	// EP1 for data OUT
 #define CDC_CMD_EP						0x82	// EP2 for CDC commands
 #define MIDI_IN_EP						0x83	// EP3 for MIDI In
-#define MIDI_OUT_EP						0x02	// EP2 for MIDI Out
+#define MIDI_OUT_EP						0x03	// EP3 for MIDI Out
 #define CDC_FS_BINTERVAL				0x10
 
 /* CDC Endpoints parameters: you can fine tune these values depending on the needed baudrates and performance. */
@@ -224,8 +224,8 @@ public:
 			USB_DESC_TYPE_DEVICE,	// bDescriptorType
 			0x01,					// bcdUSB  - 0x01 if LPM enabled
 			0x02,
-			0x02,					// bDeviceClass: (Communications and CDC Control)
-			0x02,					// bDeviceSubClass
+			0xEF,					// bDeviceClass: (Miscellaneous)
+			0x02,					// bDeviceSubClass (Interface Association Descriptor)
 			0x00,					// bDeviceProtocol
 			64,  					// bMaxPacketSize
 			LOBYTE(USBD_VID),		// idVendor
@@ -247,7 +247,7 @@ public:
 			USB_DESC_TYPE_CONFIGURATION,		// bDescriptorType: Configuration
 			LOBYTE(CDC_MIDI_CONFIG_DESC_SIZE),	// wTotalLength
 			HIBYTE(CDC_MIDI_CONFIG_DESC_SIZE),
-			0x04,								// bNumInterfaces: 3 interfaces
+			0x04,								// bNumInterfaces: 4 interfaces FIXME
 			0x01,								// bConfigurationValue: Configuration value
 			0x00,								// iConfiguration: Index of string descriptor describing the configuration
 			0xC0,								// bmAttributes: self powered

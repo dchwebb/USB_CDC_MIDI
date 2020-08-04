@@ -29,6 +29,7 @@ uint32_t debugClDiff = 0;
 volatile uint8_t uartCmdPos = 0;
 volatile char uartCmd[100];
 volatile bool uartCmdRdy = false;
+bool dumped = false;
 
 extern "C" {
 #include "interrupts.h"
@@ -65,8 +66,8 @@ void uartSendStr(const std::string& s) {
 	}
 }
 
-void dumpArray(std::string loopback) {
-	usb.SendData((uint8_t*)loopback.c_str(), loopback.length());
+void dumpArray() {		//std::string loopback
+	//usb.SendData((uint8_t*)loopback.c_str(), loopback.length());
 
 	uartSendStr("Event,Interrupt,Int Data,Endpoint,mRequest,Request,Value,Index,Length,PacketSize,XferBuff0,XferBuff1\n");
 	uint16_t evNo = usb.usbDebugEvent % USB_DEBUG_COUNT;
@@ -103,7 +104,7 @@ int main(void)
 	InitUART();
 	InitSysTick();
 	usb.InitUSB();
-
+	InitIO();
 
 //	dacHandler.initDAC();
 
@@ -120,6 +121,15 @@ int main(void)
 //		midiHandler.gateTimer();
 //		cfg.SaveConfig();		// Checks if configuration change is pending a save
 
+		if (GPIOC->IDR & GPIO_IDR_ID13 && !dumped) {
+			GPIOB->ODR |= GPIO_ODR_OD7;
+			dumped = true;
+			dumpArray();
+		} else {
+			GPIOB->ODR &= ~GPIO_ODR_OD7;
+			dumped = false;
+		}
+
 		// Check if a UART command has been received
 		if (uartCmdRdy) {
 			std::stringstream ss;
@@ -127,7 +137,7 @@ int main(void)
 				if (uartCmd[c] == 10) {
 					//can.pendingCmd = ss.str();
 					//uartSendString("Received: " + ss.str());
-					dumpArray("Received: " + ss.str());
+					usb.SendData((uint8_t*)uartCmd, c);
 					break;
 				}
 				else
