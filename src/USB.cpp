@@ -334,6 +334,46 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 					outBuff += outBuffSize;		// Move pointer forwards
 					uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MSK));
 					USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
+
+
+/*	// from PCD_WriteEmptyTxFifo
+ 	len = ep->xfer_len - ep->xfer_count;
+
+	if (len > ep->maxpacket)
+	{
+		len = ep->maxpacket;
+	}
+
+	len32b = (len + 3U) / 4U;
+
+  				while (((USBx_INEP(epnum)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV) >= len32b) &&
+							(ep->xfer_count < ep->xfer_len) && (ep->xfer_len != 0U))
+					{
+						 Write the FIFO
+						len = ep->xfer_len - ep->xfer_count;
+
+						if (len > ep->maxpacket)
+						{
+							len = ep->maxpacket;
+						}
+						len32b = (len + 3U) / 4U;
+
+						usbDebug[usbEventNo].PacketSize = ep->xfer_len;
+						usbDebug[usbEventNo].xferBuff0 = ((uint32_t*)ep->xfer_buff)[0];
+						usbDebug[usbEventNo].xferBuff1 = ((uint32_t*)ep->xfer_buff)[1];
+
+						(void)USB_WritePacket(USBx, ep->xfer_buff, (uint8_t)epnum, (uint16_t)len,
+								(uint8_t)hpcd->Init.dma_enable);
+
+						ep->xfer_buff  += len;
+						ep->xfer_count += len;
+					}
+
+					if (ep->xfer_len <= ep->xfer_count)
+					{
+						fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MSK));
+						USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
+					}*/
 				}
 
 				if ((epint & USB_OTG_DIEPINT_TOC) == USB_OTG_DIEPINT_TOC) {					// Timeout condition
