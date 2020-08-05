@@ -669,9 +669,16 @@ void USB::USBD_GetDescriptor(usbRequest req)
 	      break;
 
 	    case USBD_IDX_INTERFACE_STR:	// 305
-			outBuffSize = USBD_GetString((uint8_t*)USBD_INTERFACE_FS, USBD_StrDesc);
+			outBuffSize = USBD_GetString((uint8_t*)USBD_INTERFACE_STRING, USBD_StrDesc);
 			outBuff = USBD_StrDesc;
 	      break;
+
+/*
+	    case USBD_IDX_IAD_CDC_STR:	// 306
+			outBuffSize = USBD_GetString((uint8_t*)USBD_INTERFACE_STRING, USBD_StrDesc);
+			outBuff = USBD_StrDesc;
+	      break;
+*/
 
 		default:
 			USBD_CtlError();

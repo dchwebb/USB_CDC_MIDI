@@ -55,6 +55,7 @@ extern uint16_t usbEventNo;
 #define USBD_IDX_SERIAL_STR				0x03U
 #define USBD_IDX_CONFIG_STR				0x04U
 #define USBD_IDX_INTERFACE_STR			0x05U
+//#define USBD_IDX_IAD_CDC_STR			0x06U
 
 #define USB_DESC_TYPE_DEVICE			0x01U
 #define USB_DESC_TYPE_CONFIGURATION		0x02U
@@ -62,7 +63,8 @@ extern uint16_t usbEventNo;
 #define USB_DESC_TYPE_INTERFACE			0x04U
 #define USB_DESC_TYPE_ENDPOINT			0x05U
 #define USB_DESC_TYPE_DEVICE_QUALIFIER	0x06U
-#define USB_DESC_TYPE_OTHER_SPEED_CONFIGURATION		  0x07U
+#define USB_DESC_TYPE_OTHER_SPEED_CFG	0x07U
+#define USB_DESC_TYPE_IAD				0x0BU
 #define USB_DESC_TYPE_BOS				0x0FU
 
 #define USB_LEN_DEV_QUALIFIER_DESC		0x0AU
@@ -103,12 +105,12 @@ extern uint16_t usbEventNo;
 #define USBD_PID_FS						22352
 #define USBD_PRODUCT_STRING_FS			"Mountjoy MIDI"
 #define USBD_CONFIG_FS					"CDC Config"
-#define USBD_INTERFACE_FS				"CDC Interface"
+#define USBD_INTERFACE_STRING			"Mountjoy CDC Interface"
 
 #define CLASS_SPECIFIC_DESC_SIZE		50
 #define MIDI_CONFIG_DESC_SIZE 			86
 #define USB_CDC_CONFIG_DESC_SIZ			67
-#define CDC_MIDI_CONFIG_DESC_SIZE		144
+#define CDC_MIDI_CONFIG_DESC_SIZE		152
 #define CLASS_AUDIO						0x01
 #define SUBCLASS_MIDISTREAMING			0x03
 
@@ -225,8 +227,8 @@ public:
 			0x01,					// bcdUSB  - 0x01 if LPM enabled
 			0x02,
 			0xEF,					// bDeviceClass: (Miscellaneous)
-			0x02,					// bDeviceSubClass (Interface Association Descriptor)
-			0x00,					// bDeviceProtocol
+			0x02,					// bDeviceSubClass (Interface Association Descriptor- with below)
+			0x01,					// bDeviceProtocol (Interface Association Descriptor)
 			64,  					// bMaxPacketSize
 			LOBYTE(USBD_VID),		// idVendor
 			HIBYTE(USBD_VID),		// idVendor
@@ -254,6 +256,15 @@ public:
 			0x32,								// MaxPower 0 mA
 
 			//---------------------------------------------------------------------------
+	        // IAD Descriptor - Interface association descriptor for CDC class
+			0x08,								// bLength (8 bytes)
+			USB_DESC_TYPE_IAD,					// bDescriptorType
+			0x00,								// bFirstInterface
+			0x02,								// bInterfaceCount
+			0x02,								// bFunctionClass (Communications and CDC Control)
+			0x02,								// bFunctionSubClass
+			0x01,								// bFunctionProtocol
+			USBD_IDX_INTERFACE_STR,				// iFunction (String Descriptor 6)
 
 			// Interface Descriptor
 			0x09,								// bLength: Interface Descriptor size
@@ -264,7 +275,7 @@ public:
 			0x02,								// bInterfaceClass: Communication Interface Class
 			0x02,								// bInterfaceSubClass: Abstract Control Model
 			0x01,								// bInterfaceProtocol: Common AT commands
-			0x00,								// iInterface:
+			USBD_IDX_INTERFACE_STR,				// iInterface
 
 			// Header Functional Descriptor
 			0x05,								// bLength: Endpoint Descriptor size
