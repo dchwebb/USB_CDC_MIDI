@@ -198,7 +198,8 @@ public:
 	uint32_t USBD_GetString(uint8_t *desc, uint8_t *unicode);
 	void SendData(const uint8_t *data, uint16_t len);
 
-	std::function<void(uint8_t*,uint32_t)> dataHandler;	// Declare data handler to store incoming data
+	std::function<void(uint8_t*,uint32_t)> dataHandler;			// Declare data handler to store incoming CDC data
+	std::function<void(uint8_t*,uint32_t)> midiDataHandler;		// Declare data handler to store incoming midi data
 
 	usbRequest req;
 	uint8_t ep0_maxPacket = 0x40;

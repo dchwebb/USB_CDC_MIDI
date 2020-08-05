@@ -3,9 +3,7 @@
 #include "MidiHandler.h"
 #include "DACHandler.h"
 #include "Config.h"
-#include <string>
-#include <sstream>
-#include <iomanip>
+#include "uartHandler.h"
 
 USB usb;
 
@@ -37,34 +35,7 @@ extern "C" {
 
 
 
-std::string IntToString(const int32_t& v) {
-	std::stringstream ss;
-	ss << v;
-	return ss.str();
-}
 
-std::string HexToString(const uint32_t& v, const bool& spaces) {
-	std::stringstream ss;
-	ss << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << v;
-	if (spaces) {
-		//std::string s = ss.str();
-		return ss.str().insert(2, " ").insert(5, " ").insert(8, " ");
-	}
-	return ss.str();
-}
-
-std::string HexByte(const uint16_t& v) {
-	std::stringstream ss;
-	ss << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << v;
-	return ss.str();
-}
-
-void uartSendStr(const std::string& s) {
-	for (char c : s) {
-		while ((USART3->SR & USART_SR_TXE) == 0);
-		USART3->DR = c;
-	}
-}
 
 void dumpArray() {		//std::string loopback
 	//usb.SendData((uint8_t*)loopback.c_str(), loopback.length());
@@ -109,11 +80,10 @@ int main(void)
 //	dacHandler.initDAC();
 
 //	cfg.RestoreConfig();
-//	midiHandler.setConfig();
+	midiHandler.setConfig();
 
 	// Bind the usb.dataHandler function to the midiHandler's event handler
-	//usb.dataHandler = std::bind(&MidiHandler::eventHandler, &midiHandler, std::placeholders::_1);
-
+	usb.midiDataHandler = std::bind(&MidiHandler::eventHandler, &midiHandler, std::placeholders::_1, std::placeholders::_2);
 	usb.dataHandler = std::bind(usbSerialdata, std::placeholders::_1, std::placeholders::_2);
 
 	while (1)

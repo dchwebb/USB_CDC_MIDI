@@ -1,4 +1,5 @@
 #include "MidiHandler.h"
+#include "uartHandler.h"
 
 //extern MidiData midiArray[MIDIBUFFERSIZE];		// for debugging
 channelNote MidiHandler::channelNotes[16] = {};		// definition of static declared array
@@ -96,7 +97,7 @@ void MidiHandler::serialHandler(uint32_t data) {
 			QueueInc();
 		}
 
-		eventHandler(event.data);
+		midiEvent(event.data);
 
 		type = static_cast<MIDIType>(Queue[QueueRead] >> 4);
 		channel = Queue[QueueRead] & 0x0F;
@@ -104,7 +105,7 @@ void MidiHandler::serialHandler(uint32_t data) {
 
 	// Clock
 	if (QueueSize > 0 && Queue[QueueRead] == 0xF8) {
-		eventHandler(0xF800);
+		midiEvent(0xF800);
 		QueueInc();
 	}
 
@@ -119,10 +120,38 @@ inline void MidiHandler::QueueInc() {
 	QueueRead = (QueueRead + 1) % MIDIQUEUESIZE;
 }
 
-void MidiHandler::eventHandler(const uint32_t& data)
-{
+void MidiHandler::eventHandler(uint8_t* data, uint32_t length) {
+	if (length == 4) {
+		midiEvent(*(uint32_t*)data);
+	} else if (data[1] == 0xF0 && length > 3) {		// Sysex
+		// sysEx will be padded when supplied by usb - add only actual sysEx message bytes to array
+		uint8_t sysExCnt = 2, i = 0;
+		for (i = 0; i < 32; ++i) {
+			if (data[sysExCnt] == 0xF7) break;
+			sysEx[i] = data[sysExCnt++];
+
+			// remove 1 byte padding at the beginning of each 32bit word
+			if (sysExCnt % 4 == 0) {
+				++sysExCnt;
+			}
+		}
+		sysExCount = i;
+		MidiData tx;
+		tx.Code = 0x03;
+		tx.db0 = 0xF0;
+		tx.db1 = sysExCount;
+		tx.db2 = 0xF7;
+		usb.SendData((uint8_t*) &tx, 4);
+		//usb.SendData(sysEx, sysExCount);		// NB to get this to work we would need to prefix each packet with the appropriate CIN (see note at bottom)
+	}
+}
+
+void MidiHandler::midiEvent(const uint32_t& data) {
 
 	MidiData midiEvent = MidiData(data);
+
+	uartSendStr("Midi Event:" + HexToString(data, false) + "\n");
+
 
 	// Store Midi events to array for debugging
 	/*midiArray[midiEventRead] = midiEvent;
