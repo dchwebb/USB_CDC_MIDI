@@ -159,11 +159,11 @@ private:
 	void USB_WritePacket(const uint8_t* src, uint8_t endpoint, uint16_t len);
 	void USBD_GetDescriptor(usbRequest req);
 	void USBD_StdDevReq (usbRequest req);
-	void USB_EP0StartXfer(bool is_in, uint8_t endpoint, uint32_t xfer_len);
+	void USB_EPStartXfer(bool is_in, uint8_t endpoint, uint32_t xfer_len);
 	void USBD_CtlError();
 	bool USB_ReadInterrupts(uint32_t interrupt);
 	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
-	uint32_t USBD_GetString(uint8_t* desc, uint8_t* unicode);
+	uint32_t USBD_GetString(const uint8_t* desc, uint8_t* unicode);
 
 	usbRequest req;
 	const uint8_t ep_maxPacket = 0x40;
@@ -179,7 +179,6 @@ private:
 	bool transmitting;
 
 	USBD_CDC_LineCodingTypeDef USBD_CDC_LineCoding;
-
 
 	// USB standard device descriptor - in usbd_desc.c
 	const uint8_t USBD_FS_DeviceDesc[0x12] = {
