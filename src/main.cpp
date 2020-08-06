@@ -107,7 +107,7 @@ int main(void)
 				if (uartCmd[c] == 10) {
 					//can.pendingCmd = ss.str();
 					//uartSendString("Received: " + ss.str());
-					usb.SendData((uint8_t*)uartCmd, c);
+					usb.SendData((uint8_t*)uartCmd, c, CDC_IN_EP);
 					break;
 				}
 				else

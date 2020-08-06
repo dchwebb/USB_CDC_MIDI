@@ -819,6 +819,9 @@ void USB::USB_EP0StartXfer(bool is_in, uint8_t epnum, uint32_t xfer_len)
 {
 	// IN endpoint
 	if (is_in) {
+
+		epnum = epnum & EP_ADDR_MSK;			// Strip out 0x80 if endpoint passed eg as 0x81
+
 		USBx_INEP(epnum)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_PKTCNT);
 		USBx_INEP(epnum)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_XFRSIZ);
 
@@ -889,13 +892,13 @@ bool USB::USB_ReadInterrupts(uint32_t interrupt){
 	return ((USB_OTG_FS->GINTSTS & USB_OTG_FS->GINTMSK) & interrupt) == interrupt;
 }
 
-void USB::SendData(const uint8_t *data, uint16_t len) {
+void USB::SendData(const uint8_t *data, uint16_t len, uint8_t endpoint) {
 	if (dev_state == USBD_STATE_CONFIGURED) {
 		if (!transmitting) {
 			transmitting = true;
 			outBuff = (uint8_t*)data;
 			outBuffSize = len;
-			USB_EP0StartXfer(DIR_IN, 1, len);
+			USB_EP0StartXfer(DIR_IN, endpoint, len);
 		}
 	}
 }
