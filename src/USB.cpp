@@ -174,15 +174,12 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 						ep0_state = USBD_EP0_IDLE;
 						USBx_OUTEP(epnum)->DOEPCTL |= USB_OTG_DOEPCTL_STALL;
 					} else {
-						/*// Add buffer contents to midiArray
-						midiArray[midiEventWrite++].data = *xfer_buff;
-						if (midiEventWrite >= MIDIBUFFERSIZE)	midiEventWrite = 0;
-*/
+						// Call appropriate data handler depending on endpoint of data
 						USB_EP0StartXfer(DIR_OUT, epnum, xfer_count);
-						if (epnum == MIDI_OUT_EP) {
+						if (epnum == MIDI_Out) {
 							midiDataHandler((uint8_t*)xfer_buff, xfer_count);
 						} else {
-							dataHandler((uint8_t*)xfer_buff, xfer_count);
+							cdcDataHandler((uint8_t*)xfer_buff, xfer_count);
 						}
 					}
 				}
@@ -230,15 +227,6 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 								USB_EP0StartXfer(DIR_IN, 0, 0);
 							}
 
-						} else if (req.mRequest == 0x81) {
-
-							if (req.Value >> 8 == 0x22)		// 0x22 = CUSTOM_HID_REPORT_DESC
-							{
-								outBuffSize = std::min((uint16_t)0x4A, req.Length);		// 0x4A = USBD_CUSTOM_HID_REPORT_DESC_SIZE
-								outBuff = CUSTOM_HID_ReportDesc_FS;
-								ep0_state = USBD_EP0_DATA_IN;
-								USB_EP0StartXfer(DIR_IN, 0, outBuffSize);
-							}
 						}
 						break;
 
@@ -281,11 +269,11 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 			if ((ep_intr & 1) != 0) { // In ITR [initially true]
 				usbDebug[usbDebugNo].endpoint = epnum;
 
-				epint = USBx_INEP((uint32_t)epnum)->DIEPINT & (USBx_DEVICE->DIEPMSK | (((USBx_DEVICE->DIEPEMPMSK >> (epnum & EP_ADDR_MSK)) & 0x1U) << 7));
+				epint = USBx_INEP((uint32_t)epnum)->DIEPINT & (USBx_DEVICE->DIEPMSK | (((USBx_DEVICE->DIEPEMPMSK >> (epnum & EP_ADDR_MASK)) & 0x1U) << 7));
 				usbDebug[usbDebugNo].IntData = epint;
 
 				if ((epint & USB_OTG_DIEPINT_XFRC) == USB_OTG_DIEPINT_XFRC) {			// 0x1 Transfer completed interrupt
-					uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MSK));
+					uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MASK));
 					USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
 
 					USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_XFRC;
@@ -311,7 +299,7 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 								//HAL_PCD_EP_Receive
 								xfer_rem = 0;
 								xfer_buff[0] = 0;
-								USB_EP0StartXfer(DIR_OUT, 0, ep0_maxPacket);
+								USB_EP0StartXfer(DIR_OUT, 0, ep_maxPacket);
 							}
 						} else if ((ep0_state == USBD_EP0_STATUS_IN) || (ep0_state == USBD_EP0_IDLE)) {		// second time around
 							//USB_EPSetStall(epnum);
@@ -322,21 +310,21 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 				}
 
 				if ((epint & USB_OTG_DIEPINT_TXFE) == USB_OTG_DIEPINT_TXFE) {				// 0x80 Transmit FIFO empty
-					uint32_t maxPacket = (epnum == 0 ? ep0_maxPacket : ep_maxPacket);
+					//uint32_t maxPacket = (epnum == 0 ? ep_maxPacket : ep_maxPacket);
 
 					usbDebug[usbDebugNo].PacketSize = outBuffSize;
 					usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
 					usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
 
-					if (outBuffSize > maxPacket) {
-						xfer_rem = outBuffSize - maxPacket;
-						outBuffSize = maxPacket;
+					if (outBuffSize > ep_maxPacket) {
+						xfer_rem = outBuffSize - ep_maxPacket;
+						outBuffSize = ep_maxPacket;
 					}
 
 					USB_WritePacket(outBuff, epnum, (uint16_t)outBuffSize);
 
 					outBuff += outBuffSize;		// Move pointer forwards
-					uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MSK));
+					uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MASK));
 					USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
 
 
@@ -375,7 +363,7 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 
 					if (ep->xfer_len <= ep->xfer_count)
 					{
-						fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MSK));
+						fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MASK));
 						USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
 					}*/
 				}
@@ -563,25 +551,25 @@ void USB::InitUSB()
     USB_OTG_FS->GAHBCFG |= USB_OTG_GAHBCFG_GINT;		// Activate USB Interrupts
 }
 
-void USB::USB_ActivateEndpoint(uint32_t epnum, bool is_in, uint8_t eptype)
+void USB::USB_ActivateEndpoint(uint8_t endpoint, bool is_in, uint8_t eptype)
 {
-	uint8_t maxpktsize = (epnum == 0 ? ep0_maxPacket : ep_maxPacket);
-	epnum = epnum & 0xF;
+	//uint8_t maxpktsize = (endpoint == 0 ? ep_maxPacket : ep_maxPacket);
+	endpoint = endpoint & 0xF;
 
 	if (is_in) {
-		USBx_DEVICE->DAINTMSK |= USB_OTG_DAINTMSK_IEPM & (uint32_t)(1UL << (epnum & EP_ADDR_MSK));
+		USBx_DEVICE->DAINTMSK |= USB_OTG_DAINTMSK_IEPM & (uint32_t)(1UL << (endpoint & EP_ADDR_MASK));
 
-		if ((USBx_INEP(epnum)->DIEPCTL & USB_OTG_DIEPCTL_USBAEP) == 0U) {
-			USBx_INEP(epnum)->DIEPCTL |= (maxpktsize & USB_OTG_DIEPCTL_MPSIZ) |
-					((uint32_t)eptype << 18) | (epnum << 22) |
+		if ((USBx_INEP(endpoint)->DIEPCTL & USB_OTG_DIEPCTL_USBAEP) == 0U) {
+			USBx_INEP(endpoint)->DIEPCTL |= (ep_maxPacket & USB_OTG_DIEPCTL_MPSIZ) |
+					((uint32_t)eptype << 18) | (endpoint << 22) |
 					USB_OTG_DIEPCTL_SD0PID_SEVNFRM |
 					USB_OTG_DIEPCTL_USBAEP;
 		}
 	} else {
-		USBx_DEVICE->DAINTMSK |= USB_OTG_DAINTMSK_OEPM & ((uint32_t)(1UL << (epnum & EP_ADDR_MSK)) << 16);
+		USBx_DEVICE->DAINTMSK |= USB_OTG_DAINTMSK_OEPM & ((uint32_t)(1UL << (endpoint & EP_ADDR_MASK)) << 16);
 
-		if (((USBx_OUTEP(epnum)->DOEPCTL) & USB_OTG_DOEPCTL_USBAEP) == 0U) {
-			USBx_OUTEP(epnum)->DOEPCTL |= (maxpktsize & USB_OTG_DOEPCTL_MPSIZ) |
+		if (((USBx_OUTEP(endpoint)->DOEPCTL) & USB_OTG_DOEPCTL_USBAEP) == 0U) {
+			USBx_OUTEP(endpoint)->DOEPCTL |= (ep_maxPacket & USB_OTG_DOEPCTL_MPSIZ) |
 					((uint32_t)eptype << 18) |
 					USB_OTG_DIEPCTL_SD0PID_SEVNFRM |
 					USB_OTG_DOEPCTL_USBAEP;
@@ -591,9 +579,9 @@ void USB::USB_ActivateEndpoint(uint32_t epnum, bool is_in, uint8_t eptype)
 }
 
 // USB_ReadPacket : read a packet from the RX FIFO
-void USB::USB_ReadPacket(uint32_t *dest, uint16_t len)
+void USB::USB_ReadPacket(const uint32_t* dest, uint16_t len)
 {
-	uint32_t *pDest = (uint32_t *)dest;
+	uint32_t* pDest = (uint32_t*)dest;
 	uint32_t count32b = ((uint32_t)len + 3U) / 4U;
 
 	for (uint32_t i = 0; i < count32b; i++)	{
@@ -602,13 +590,13 @@ void USB::USB_ReadPacket(uint32_t *dest, uint16_t len)
 	}
 }
 
-void USB::USB_WritePacket(uint8_t *src, uint32_t ch_ep_num, uint16_t len)
+void USB::USB_WritePacket(const uint8_t* src, uint8_t endpoint, uint16_t len)
 {
 	uint32_t *pSrc = (uint32_t *)src;
 	uint32_t count32b = ((uint32_t)len + 3U) / 4U;
 
 	for (uint32_t i = 0; i < count32b; i++) {
-		USBx_DFIFO(ch_ep_num) = *pSrc;
+		USBx_DFIFO(endpoint) = *pSrc;
 		pSrc++;
 	}
 }
@@ -771,11 +759,11 @@ void USB::USBD_StdDevReq(usbRequest req)
 			if (dev_state == USBD_STATE_ADDRESSED) {
 				dev_state = USBD_STATE_CONFIGURED;
 
-				USB_ActivateEndpoint(CDC_IN_EP,   DIR_IN,  USBD_EP_TYPE_BULK);		// Activate CDC in endpoint
-				USB_ActivateEndpoint(CDC_OUT_EP,  DIR_OUT, USBD_EP_TYPE_BULK);		// Activate CDC out endpoint
-				USB_ActivateEndpoint(CDC_CMD_EP,  DIR_IN,  USBD_EP_TYPE_INTR);		// Activate Command IN EP
-				USB_ActivateEndpoint(MIDI_IN_EP,  DIR_IN,  USBD_EP_TYPE_BULK);		// Activate MIDI in endpoint
-				USB_ActivateEndpoint(MIDI_OUT_EP, DIR_OUT, USBD_EP_TYPE_BULK);		// Activate MIDI out endpoint
+				USB_ActivateEndpoint(CDC_In,   DIR_IN,  USBD_EP_TYPE_BULK);		// Activate CDC in endpoint
+				USB_ActivateEndpoint(CDC_Out,  DIR_OUT, USBD_EP_TYPE_BULK);		// Activate CDC out endpoint
+				USB_ActivateEndpoint(CDC_Cmd,  DIR_IN,  USBD_EP_TYPE_INTR);		// Activate Command IN EP
+				USB_ActivateEndpoint(MIDI_In,  DIR_IN,  USBD_EP_TYPE_BULK);		// Activate MIDI in endpoint
+				USB_ActivateEndpoint(MIDI_Out, DIR_OUT, USBD_EP_TYPE_BULK);		// Activate MIDI out endpoint
 
 				USB_EP0StartXfer(DIR_OUT, req.Value, 0x40);		// FIXME maxpacket is 2 for EP 1: CUSTOM_HID_EPIN_SIZE, 0x40 = CDC_DATA_FS_OUT_PACKET_SIZE
 
@@ -815,41 +803,41 @@ void USB::USBD_StdDevReq(usbRequest req)
 
 }
 
-void USB::USB_EP0StartXfer(bool is_in, uint8_t epnum, uint32_t xfer_len)
+void USB::USB_EP0StartXfer(bool is_in, uint8_t endpoint, uint32_t xfer_len)
 {
 	// IN endpoint
 	if (is_in) {
 
-		epnum = epnum & EP_ADDR_MSK;			// Strip out 0x80 if endpoint passed eg as 0x81
+		endpoint = endpoint & EP_ADDR_MASK;			// Strip out 0x80 if endpoint passed eg as 0x81
 
-		USBx_INEP(epnum)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_PKTCNT);
-		USBx_INEP(epnum)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_XFRSIZ);
+		USBx_INEP(endpoint)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_PKTCNT);
+		USBx_INEP(endpoint)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_XFRSIZ);
 
-		uint32_t maxPacket = (epnum == 0 ? ep0_maxPacket : ep_maxPacket);
+		//uint32_t maxPacket = (endpoint == 0 ? ep_maxPacket : ep_maxPacket);
 
 		// Program the transfer size and packet count as follows: xfersize = N * maxpacket + short_packet pktcnt = N + (short_packet exist ? 1 : 0)
-		if (xfer_len > maxPacket && epnum == 0) {		// currently set to 0x40
-			xfer_rem = xfer_len - maxPacket;
-			xfer_len = maxPacket;
+		if (xfer_len > ep_maxPacket && endpoint == 0) {		// currently set to 0x40
+			xfer_rem = xfer_len - ep_maxPacket;
+			xfer_len = ep_maxPacket;
 		}
-		USBx_INEP(epnum)->DIEPTSIZ |= (USB_OTG_DIEPTSIZ_PKTCNT & (((xfer_len + maxPacket - 1) / maxPacket) << 19));
-		USBx_INEP(epnum)->DIEPTSIZ |= (USB_OTG_DIEPTSIZ_XFRSIZ & xfer_len);
+		USBx_INEP(endpoint)->DIEPTSIZ |= (USB_OTG_DIEPTSIZ_PKTCNT & (((xfer_len + ep_maxPacket - 1) / ep_maxPacket) << 19));
+		USBx_INEP(endpoint)->DIEPTSIZ |= (USB_OTG_DIEPTSIZ_XFRSIZ & xfer_len);
 
-		USBx_INEP(epnum)->DIEPCTL |= (USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA);	// EP enable, IN data in FIFO
+		USBx_INEP(endpoint)->DIEPCTL |= (USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA);	// EP enable, IN data in FIFO
 
 		// Enable the Tx FIFO Empty Interrupt for this EP
 		if (xfer_len > 0) {
-			USBx_DEVICE->DIEPEMPMSK |= 1UL << (epnum & EP_ADDR_MSK);
+			USBx_DEVICE->DIEPEMPMSK |= 1UL << (endpoint & EP_ADDR_MASK);
 		}
 	} else { 		// OUT endpoint
 		// Program the transfer size and packet count as follows: pktcnt = N xfersize = N * maxpacket
-		USBx_OUTEP(epnum)->DOEPTSIZ &= ~(USB_OTG_DOEPTSIZ_XFRSIZ);
-		USBx_OUTEP(epnum)->DOEPTSIZ &= ~(USB_OTG_DOEPTSIZ_PKTCNT);
+		USBx_OUTEP(endpoint)->DOEPTSIZ &= ~(USB_OTG_DOEPTSIZ_XFRSIZ);
+		USBx_OUTEP(endpoint)->DOEPTSIZ &= ~(USB_OTG_DOEPTSIZ_PKTCNT);
 
-		USBx_OUTEP(epnum)->DOEPTSIZ |= (USB_OTG_DOEPTSIZ_PKTCNT & (1U << 19));
-		USBx_OUTEP(epnum)->DOEPTSIZ |= (USB_OTG_DOEPTSIZ_XFRSIZ & xfer_len);
+		USBx_OUTEP(endpoint)->DOEPTSIZ |= (USB_OTG_DOEPTSIZ_PKTCNT & (1U << 19));
+		USBx_OUTEP(endpoint)->DOEPTSIZ |= (USB_OTG_DOEPTSIZ_XFRSIZ & xfer_len);
 
-		USBx_OUTEP(epnum)->DOEPCTL |= (USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA);		// EP enable
+		USBx_OUTEP(endpoint)->DOEPCTL |= (USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA);		// EP enable
 	}
 }
 
@@ -864,11 +852,11 @@ void USB::USBD_CtlError() {
 	USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_STALL;
 }
 
-/*void USB::USB_EPSetStall(uint8_t epnum) {
-	if (((USBx_INEP(epnum)->DIEPCTL & USB_OTG_DIEPCTL_EPENA) == 0U) && (epnum != 0U)) {	//
-		USBx_INEP(epnum)->DIEPCTL &= ~(USB_OTG_DIEPCTL_EPDIS);
+/*void USB::USB_EPSetStall(uint8_t endpoint) {
+	if (((USBx_INEP(endpoint)->DIEPCTL & USB_OTG_DIEPCTL_EPENA) == 0U) && (endpoint != 0U)) {	//
+		USBx_INEP(endpoint)->DIEPCTL &= ~(USB_OTG_DIEPCTL_EPDIS);
 	}
-	USBx_INEP(epnum)->DIEPCTL |= USB_OTG_DIEPCTL_STALL;
+	USBx_INEP(endpoint)->DIEPCTL |= USB_OTG_DIEPCTL_STALL;
 
 	// FIXME - cleared in USB_EP0StartXfer?
 	//USB_EP0_OutStart

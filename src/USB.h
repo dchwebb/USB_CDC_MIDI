@@ -27,15 +27,14 @@ extern uint16_t usbEventNo;
 #define USB_REQ_RECIPIENT_ENDPOINT		0x02U
 #define USB_REQ_RECIPIENT_MASK			0x03U
 
-#define EP_ADDR_MSK						0xFU
+#define EP_ADDR_MASK					0xFU
+#define USB_REQ_DIRECTION_MASK			0x80U
 
 // USB Request types
 #define USB_REQ_TYPE_STANDARD			0x00U
 #define USB_REQ_TYPE_CLASS				0x20U
 #define USB_REQ_TYPE_VENDOR				0x40U
 #define USB_REQ_TYPE_MASK				0x60U
-
-#define USB_REQ_DIRECTION_MASK			0x80U
 
 #define USB_REQ_GET_STATUS				0x00U
 #define USB_REQ_CLEAR_FEATURE			0x01U
@@ -45,9 +44,6 @@ extern uint16_t usbEventNo;
 #define USB_REQ_SET_DESCRIPTOR			0x07U
 #define USB_REQ_GET_CONFIGURATION		0x08U
 #define USB_REQ_SET_CONFIGURATION		0x09U
-#define USB_REQ_GET_INTERFACE			0x0AU
-#define USB_REQ_SET_INTERFACE			0x0BU
-#define USB_REQ_SYNCH_FRAME				0x0CU
 
 #define USBD_IDX_LANGID_STR				0x00U
 #define USBD_IDX_MFC_STR				0x01U
@@ -55,7 +51,6 @@ extern uint16_t usbEventNo;
 #define USBD_IDX_SERIAL_STR				0x03U
 #define USBD_IDX_CONFIG_STR				0x04U
 #define USBD_IDX_INTERFACE_STR			0x05U
-//#define USBD_IDX_IAD_CDC_STR			0x06U
 
 #define USB_DESC_TYPE_DEVICE			0x01U
 #define USB_DESC_TYPE_CONFIGURATION		0x02U
@@ -66,17 +61,6 @@ extern uint16_t usbEventNo;
 #define USB_DESC_TYPE_OTHER_SPEED_CFG	0x07U
 #define USB_DESC_TYPE_IAD				0x0BU
 #define USB_DESC_TYPE_BOS				0x0FU
-
-#define USB_LEN_DEV_QUALIFIER_DESC		0x0AU
-#define USB_LEN_DEV_DESC				0x12U
-#define USB_LEN_CFG_DESC				0x09U
-#define USB_LEN_IF_DESC					0x09U
-#define USB_LEN_EP_DESC					0x07U
-#define USB_LEN_OTG_DESC				0x03U
-#define USB_LEN_LANGID_STR_DESC			0x04U
-#define USB_LEN_OTHER_SPEED_DESC_SIZ	0x09U
-#define USBD_MAX_STR_DESC_SIZ	  		512U
-#define USBD_CUSTOM_HID_REPORT_DESC_SIZE	0x4A
 
 // EP0 State
 #define USBD_EP0_IDLE					0x00U
@@ -98,7 +82,6 @@ extern uint16_t usbEventNo;
 #define USBD_STATE_CONFIGURED			0x03U
 #define USBD_STATE_SUSPENDED			0x04U
 
-
 #define USBD_VID						1155
 #define USBD_LANGID_STRING				1033
 #define USBD_MANUFACTURER_STRING		"Mountjoy Modular"
@@ -108,29 +91,10 @@ extern uint16_t usbEventNo;
 #define USBD_INTERFACE_STRING			"Mountjoy CDC Interface"
 
 #define CLASS_SPECIFIC_DESC_SIZE		50
-#define MIDI_CONFIG_DESC_SIZE 			86
-#define USB_CDC_CONFIG_DESC_SIZ			67
 #define CDC_MIDI_CONFIG_DESC_SIZE		152
-#define CLASS_AUDIO						0x01
-#define SUBCLASS_MIDISTREAMING			0x03
-
-// Endpoint defines
-#define CDC_IN_EP						0x81	// EP1 for data IN
-#define CDC_OUT_EP						0x01	// EP1 for data OUT
-#define CDC_CMD_EP						0x82	// EP2 for CDC commands
-#define MIDI_IN_EP						0x83	// EP3 for MIDI In
-#define MIDI_OUT_EP						0x03	// EP3 for MIDI Out
-#define CDC_FS_BINTERVAL				0x10
-
-/* CDC Endpoints parameters: you can fine tune these values depending on the needed baudrates and performance. */
-#define CDC_DATA_MAX_PACKET_SIZE		64U 	// Endpoint IN & OUT Packet size
-#define CDC_CMD_PACKET_SIZE				8U  	// Control Endpoint Packet size
-
-#define CDC_DATA_FS_IN_PACKET_SIZE		CDC_DATA_MAX_PACKET_SIZE
-#define CDC_DATA_FS_OUT_PACKET_SIZE		CDC_DATA_MAX_PACKET_SIZE
+#define USB_LEN_LANGID_STR_DESC			4
 
 
-//#define SWAPBYTE(addr)		  (((uint16_t)(*((uint8_t *)(addr)))) + (((uint16_t)(*(((uint8_t *)(addr)) + 1U))) << 8U))
 #define LOBYTE(x)  ((uint8_t)(x & 0x00FFU))
 #define HIBYTE(x)  ((uint8_t)((x & 0xFF00U) >> 8U))
 
@@ -144,7 +108,7 @@ struct usbRequest {
 	uint16_t Index;
 	uint16_t Length;
 
-	void loadData(uint8_t* data) {
+	void loadData(const uint8_t* data) {
 		mRequest = data[0];
 		Request = data[1];
 		Value = (uint16_t)(data[2]) + (data[3] << 8);
@@ -153,18 +117,11 @@ struct usbRequest {
 	}
 };
 
-/*LINE CODING DATA DETAILS
-Offset	Field 		Size (Bytes) 	Description
-0		dWDTERate 	4 				Data terminal rate in bits per sec.
-4 		bCharFormat 1 				Stop Bits: 0-1 Stop Bit; 1-1.5 Stop Bits; 2-2 Stop Bits
-5 		bParityType 1 				Parity: 0 = None; 1 = Odd; 2 = Even; 3 = Mark; 4 = Space; 6 bDataBits 1 Data bits
-6		bDataBits	1 				Data bits (5, 6, 7,	8 or 16)
-*/
 struct USBD_CDC_LineCodingTypeDef {
-	uint32_t bitrate;
-	uint8_t format;
-	uint8_t paritytype;
-	uint8_t datatype;
+	uint32_t bitrate;    				// Data terminal rate in bits per sec.
+	uint8_t format;      				// Stop Bits: 0-1 Stop Bit; 1-1.5 Stop Bits; 2-2 Stop Bits
+	uint8_t paritytype;  				// Parity: 0 = None; 1 = Odd; 2 = Even; 3 = Mark; 4 = Space; 6 bDataBits 1 Data bits
+	uint8_t datatype;    				// Data bits (5, 6, 7,	8 or 16)
 };
 
 #define USB_DEBUG_COUNT 400
@@ -185,29 +142,35 @@ class USB {
 public:
 	void USBInterruptHandler();
 	void InitUSB();
-	void USB_ActivateEndpoint(uint32_t epnum, bool is_in, uint8_t eptype);
-	void USB_ReadPacket(uint32_t *dest, uint16_t len);
-	void USB_WritePacket(uint8_t *src, uint32_t ch_ep_num, uint16_t len);
-	void USBD_GetDescriptor(usbRequest req);
-	void USBD_StdDevReq (usbRequest req);
-	void USB_EP0StartXfer(bool is_in, uint8_t epnum, uint32_t xfer_len);
-//	void USB_EPSetStall(uint8_t epnum);
-	void USBD_CtlError();
-	bool USB_ReadInterrupts(uint32_t interrupt);
-	void IntToUnicode(uint32_t value, uint8_t * pbuf, uint8_t len);
-	uint32_t USBD_GetString(uint8_t *desc, uint8_t *unicode);
 	void SendData(const uint8_t *data, uint16_t len, uint8_t endpoint);
 
-	std::function<void(uint8_t*,uint32_t)> dataHandler;			// Declare data handler to store incoming CDC data
+	std::function<void(uint8_t*,uint32_t)> cdcDataHandler;			// Declare data handler to store incoming CDC data
 	std::function<void(uint8_t*,uint32_t)> midiDataHandler;		// Declare data handler to store incoming midi data
 
+	usbDebugItem usbDebug[USB_DEBUG_COUNT];
+	uint16_t usbDebugNo = 0;
+	uint16_t usbDebugEvent = 0;
+
+	enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, MIDI_In = 0x83, MIDI_Out = 0x3};
+
+private:
+	void USB_ActivateEndpoint(uint8_t endpoint, bool is_in, uint8_t eptype);
+	void USB_ReadPacket(const uint32_t* dest, uint16_t len);
+	void USB_WritePacket(const uint8_t* src, uint8_t endpoint, uint16_t len);
+	void USBD_GetDescriptor(usbRequest req);
+	void USBD_StdDevReq (usbRequest req);
+	void USB_EP0StartXfer(bool is_in, uint8_t endpoint, uint32_t xfer_len);
+	void USBD_CtlError();
+	bool USB_ReadInterrupts(uint32_t interrupt);
+	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
+	uint32_t USBD_GetString(uint8_t* desc, uint8_t* unicode);
+
 	usbRequest req;
-	uint8_t ep0_maxPacket = 0x40;
-	uint8_t ep_maxPacket = 0x40;
+	const uint8_t ep_maxPacket = 0x40;
 	uint32_t xfer_buff[64];		// in HAL there is a transfer buffer for each in and out endpoint
 	uint32_t xfer_count;
 	uint32_t xfer_rem;			// If transfer is larger than maximum packet size store remaining byte count
-	uint8_t* outBuff;
+	const uint8_t* outBuff;
 	uint32_t outBuffSize;
 	uint32_t outCount;
 	uint32_t ep0_state;
@@ -215,14 +178,11 @@ public:
 	uint8_t CmdOpCode;			// stores class specific operation codes (eg CDC set line config)
 	bool transmitting;
 
-	usbDebugItem usbDebug[USB_DEBUG_COUNT];
-	uint16_t usbDebugNo = 0;
-	uint16_t usbDebugEvent = 0;
-
 	USBD_CDC_LineCodingTypeDef USBD_CDC_LineCoding;
 
+
 	// USB standard device descriptor - in usbd_desc.c
-	uint8_t USBD_FS_DeviceDesc[USB_LEN_DEV_DESC] = {
+	const uint8_t USBD_FS_DeviceDesc[0x12] = {
 			0x12,					// bLength
 			USB_DESC_TYPE_DEVICE,	// bDescriptorType
 			0x01,					// bcdUSB  - 0x01 if LPM enabled
@@ -240,11 +200,10 @@ public:
 			USBD_IDX_MFC_STR,		// Index of manufacturer  string
 			USBD_IDX_PRODUCT_STR,	// Index of product string
 			USBD_IDX_SERIAL_STR,	// Index of serial number string
-			1						// bNumConfigurations
+			0x01					// bNumConfigurations
 	};
 
-
-	uint8_t CDC_MIDI_CfgFSDesc[CDC_MIDI_CONFIG_DESC_SIZE] = {
+	const uint8_t CDC_MIDI_CfgFSDesc[CDC_MIDI_CONFIG_DESC_SIZE] = {
 			// Configuration Descriptor
 			0x09,								// bLength: Configuration Descriptor size
 			USB_DESC_TYPE_CONFIGURATION,		// bDescriptorType: Configuration
@@ -259,17 +218,7 @@ public:
 			//---------------------------------------------------------------------------
 
 			// MIDI Descriptors
-/*
-			// MIDI IAD Descriptor
-			0x08,								// bLength (8 bytes)
-			USB_DESC_TYPE_IAD,					// bDescriptorType
-			0x02,								// bFirstInterface
-			0x02,								// bInterfaceCount
-			0x01,								// bFunctionClass (Audio)
-			0x01,								// bFunctionSubClass (undefined)
-			0x00,								// bFunctionProtocol
-			0x00,								// iFunction (No String Descriptor)
-*/
+
 			// B.3.1 Standard Audio Control standard Interface Descriptor
 			0x09,								// sizeof(usbDescrInterface): length of descriptor in bytes
 			USB_DESC_TYPE_INTERFACE,			// interface descriptor type
@@ -298,8 +247,8 @@ public:
 			0x01,								// bInterfaceNumber
 			0x00,								// bAlternateSetting
 			0x02,								// bNumEndpoints
-			CLASS_AUDIO,						// bInterfaceClass
-			SUBCLASS_MIDISTREAMING,				// bInterfaceSubClass: MIDIStreaming
+			0x01,								// bInterfaceClass: Audio
+			0x03,								// bInterfaceSubClass: MIDIStreaming
 			0x00,								// InterfaceProtocol
 			0x00,								// iInterface: No String Descriptor
 
@@ -332,7 +281,7 @@ public:
 			//B.5.1 Standard Bulk OUT Endpoint Descriptor
 			0x09,								// bLength
 			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType = endpoint
-			MIDI_OUT_EP,						// bEndpointAddress OUT endpoint number 2
+			MIDI_Out,						// bEndpointAddress OUT endpoint number 2
 			0x02,								// bmAttributes: 2:Bulk, 3:Interrupt endpoint
 			0x40, 0X00,							// wMaxPacketSize 64 bytes per packet.
 			0x00,								// bInterval in ms : ignored for bulk
@@ -349,7 +298,7 @@ public:
 			//B.6.1 Standard Bulk IN Endpoint Descriptor
 			0x09,								// bLength
 			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType = endpoint
-			MIDI_IN_EP,							// bEndpointAddress IN endpoint number 3
+			MIDI_In,							// bEndpointAddress IN endpoint number 3
 			0X02,								// bmAttributes: 2: Bulk, 3: Interrupt endpoint
 			0x40, 0X00,							// wMaxPacketSize
 			0X00,								// bInterval in ms
@@ -415,11 +364,12 @@ public:
 			// Endpoint 2 Descriptor
 			0x07,								// bLength: Endpoint Descriptor size
 			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType: Endpoint
-			CDC_CMD_EP,							// bEndpointAddress
+			CDC_Cmd,							// bEndpointAddress
 			0x03,								// bmAttributes: Interrupt
-			LOBYTE(CDC_CMD_PACKET_SIZE),		// wMaxPacketSize:
-			HIBYTE(CDC_CMD_PACKET_SIZE),
-			CDC_FS_BINTERVAL,					// bInterval:
+			0x08,								// wMaxPacketSize
+			0x00,
+			0x10,								// bInterval
+
 			//---------------------------------------------------------------------------
 
 			// Data class interface descriptor
@@ -436,26 +386,24 @@ public:
 			// Endpoint OUT Descriptor
 			0x07,								// bLength: Endpoint Descriptor size
 			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType: Endpoint
-			CDC_OUT_EP,							// bEndpointAddress
+			CDC_Out,							// bEndpointAddress
 			0x02,								// bmAttributes: Bulk
-			LOBYTE(CDC_DATA_MAX_PACKET_SIZE),	// wMaxPacketSize:
-			HIBYTE(CDC_DATA_MAX_PACKET_SIZE),
+			LOBYTE(ep_maxPacket),				// wMaxPacketSize:
+			HIBYTE(ep_maxPacket),
 			0x00,								// bInterval: ignore for Bulk transfer
 
 			// Endpoint IN Descriptor
 			0x07,								// bLength: Endpoint Descriptor size
 			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType: Endpoint
-			CDC_IN_EP,							// bEndpointAddress
+			CDC_In,								// bEndpointAddress
 			0x02,								// bmAttributes: Bulk
-			LOBYTE(CDC_DATA_MAX_PACKET_SIZE),	// wMaxPacketSize:
-			HIBYTE(CDC_DATA_MAX_PACKET_SIZE),
+			LOBYTE(ep_maxPacket),				// wMaxPacketSize:
+			HIBYTE(ep_maxPacket),
 			0x00								// bInterval: ignore for Bulk transfer
-
-
 	};
 
 	// Binary Object Store (BOS) Descriptor
-	uint8_t USBD_FS_BOSDesc[0xC] = {
+	const uint8_t USBD_FS_BOSDesc[12] = {
 			0x05,								// Length
 			USB_DESC_TYPE_BOS,					// DescriptorType
 			0x0C,								// TotalLength
@@ -466,72 +414,22 @@ public:
 			0x10, 								// USB_DEVICE_CAPABITY_TYPE
 			0x02,								// Attributes
 			0x02, 0x00, 0x00, 0x00				// Link Power Management protocol is supported
-
 	};
 
 
 	uint8_t USBD_StringSerial[0x1A] = {
-			0x1A,		// size
-			0x03, 		// USB_DESC_TYPE_STRING
+			0x1A,								// Length
+			USB_DESC_TYPE_STRING, 				// DescriptorType
 	};
 
 	// USB lang indentifier descriptor
-	uint8_t USBD_LangIDDesc[USB_LEN_LANGID_STR_DESC] = {
+	const uint8_t USBD_LangIDDesc[USB_LEN_LANGID_STR_DESC] = {
 			USB_LEN_LANGID_STR_DESC,
 			USB_DESC_TYPE_STRING,
 			LOBYTE(USBD_LANGID_STRING),
 			HIBYTE(USBD_LANGID_STRING)
 	};
 
-	uint8_t USBD_StrDesc[USBD_MAX_STR_DESC_SIZ];
+	uint8_t USBD_StrDesc[128];
 
-	uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DESC_SIZE] = {
-			0x05,	0x01,
-			0x09,	0x02,
-			0xA1,	0x01,
-			0x09,	0x01,
-
-			0xA1,	0x00,
-			0x05,	0x09,
-			0x19,	0x01,
-			0x29,	0x03,
-
-			0x15,	0x00,
-			0x25,	0x01,
-			0x95,	0x03,
-			0x75,	0x01,
-
-			0x81,	0x02,
-			0x95,	0x01,
-			0x75,	0x05,
-			0x81,	0x01,
-
-			0x05,	0x01,
-			0x09,	0x30,
-			0x09,	0x31,
-			0x09,	0x38,
-
-			0x15,	0x81,
-			0x25,	0x7F,
-			0x75,	0x08,
-			0x95,	0x03,
-
-			0x81,	0x06,
-			0xC0,	0x09,
-			0x3c,	0x05,
-			0xff,	0x09,
-
-			0x01,	0x15,
-			0x00,	0x25,
-			0x01,	0x75,
-			0x01,	0x95,
-
-			0x02,	0xb1,
-			0x22,	0x75,
-			0x06,	0x95,
-			0x01,	0xb1,
-
-			0x01,
-			0xC0
-	};
 };

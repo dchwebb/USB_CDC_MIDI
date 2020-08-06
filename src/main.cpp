@@ -84,7 +84,7 @@ int main(void)
 
 	// Bind the usb.dataHandler function to the midiHandler's event handler
 	usb.midiDataHandler = std::bind(&MidiHandler::eventHandler, &midiHandler, std::placeholders::_1, std::placeholders::_2);
-	usb.dataHandler = std::bind(usbSerialdata, std::placeholders::_1, std::placeholders::_2);
+	usb.cdcDataHandler = std::bind(usbSerialdata, std::placeholders::_1, std::placeholders::_2);
 
 	while (1)
 	{
@@ -107,7 +107,7 @@ int main(void)
 				if (uartCmd[c] == 10) {
 					//can.pendingCmd = ss.str();
 					//uartSendString("Received: " + ss.str());
-					usb.SendData((uint8_t*)uartCmd, c, CDC_IN_EP);
+					usb.SendData((uint8_t*)uartCmd, c, usb.CDC_In);
 					break;
 				}
 				else
