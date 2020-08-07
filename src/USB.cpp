@@ -1,4 +1,4 @@
-#include <USB.h>
+#include "USB.h"
 
 void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_pcd.c
 
@@ -175,45 +175,22 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 
 					USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_XFRC;
 
-					if (epnum == 0) {
+					if (epnum == 0 && ep0_state == USBD_EP0_DATA_IN && xfer_rem == 0) {
+						ep0_state = USBD_EP0_STATUS_OUT;								//HAL_PCD_EP_Receive
+						xfer_buff[0] = 0;
+						USB_EPStartXfer(Direction::out, 0, ep_maxPacket);
+					}
 
-						if (ep0_state == USBD_EP0_DATA_IN) {
-							if (xfer_rem > 0) {
-								outBuffSize = xfer_rem;
-								xfer_rem = 0;
+					if (ep0_state == USBD_EP0_DATA_IN && xfer_rem > 0) {
+						outBuffSize = xfer_rem;
+						xfer_rem = 0;
 
-								usbDebug[usbDebugNo].PacketSize = outBuffSize;
-								usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
-								usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
+						usbDebug[usbDebugNo].PacketSize = outBuffSize;
+						usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
+						usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
 
-								USB_EPStartXfer(Direction::in, 0, outBuffSize);
-							} else {
-
-								//USB_EPSetStall(epnum);
-
-								ep0_state = USBD_EP0_STATUS_OUT;
-
-								//HAL_PCD_EP_Receive
-								xfer_rem = 0;
-								xfer_buff[0] = 0;
-								USB_EPStartXfer(Direction::out, 0, ep_maxPacket);
-							}
-						} else if ((ep0_state == USBD_EP0_STATUS_IN) || (ep0_state == USBD_EP0_IDLE)) {		// second time around
-							//USB_EPSetStall(epnum);
-						}
-					} else {
-						if (ep0_state == USBD_EP0_DATA_IN) {
-							if (xfer_rem > 0) {
-								outBuffSize = xfer_rem;
-								xfer_rem = 0;
-
-								usbDebug[usbDebugNo].PacketSize = outBuffSize;
-								usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
-								usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
-
-								USB_EPStartXfer(Direction::in, epnum, outBuffSize);
-							}
-						}
+						USB_EPStartXfer(Direction::in, epnum, outBuffSize);
+					} else if (epnum > 0) {
 						transmitting = false;
 					}
 				}
@@ -234,41 +211,7 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 					outBuff += outBuffSize;		// Move pointer forwards
 					uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MASK));
 					USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
-/*
-					//------------------------------------------------------
-					// from PCD_WriteEmptyTxFifo
-					uint32_t len = outBuffSize;
-					if (len > ep_maxPacket)
-						len = ep_maxPacket;
 
-					uint32_t len32b = (len + 3U) / 4U;
-
-					while ((USBx_INEP(epnum)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV) >= len32b && outBuffSize > 0) {
-						//Write the FIFO
-						len = outBuffSize;
-
-						if (len > ep_maxPacket)
-							len = ep_maxPacket;
-
-						len32b = (len + 3U) / 4U;
-
-						usbDebug[usbDebugNo].PacketSize = len;
-						usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
-						usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
-
-						//(void)USB_WritePacket(USBx, ep->xfer_buff, (uint8_t)epnum, (uint16_t)len, (uint8_t)hpcd->Init.dma_enable);
-						USB_WritePacket(outBuff, epnum, len);
-
-						outBuff += len;
-						outBuffSize -= len;
-					}
-
-					if (outBuffSize == 0) {
-						uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MASK));
-						USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
-					}
-*/
-					//------------------------------------------------------
 				}
 
 				if ((epint & USB_OTG_DIEPINT_TOC) == USB_OTG_DIEPINT_TOC) {					// Timeout condition
@@ -683,18 +626,16 @@ void USB::USBD_StdDevReq()
 
 }
 
-void USB::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len)
-{
-	// IN endpoint
-	if (direction == Direction::in) {
+void USB::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len) {
+
+	if (direction == Direction::in) {				// IN endpoint
 
 		endpoint = endpoint & EP_ADDR_MASK;			// Strip out 0x80 if endpoint passed eg as 0x81
 
 		USBx_INEP(endpoint)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_PKTCNT);
 		USBx_INEP(endpoint)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_XFRSIZ);
 
-		// Program the transfer size and packet count as follows: xfersize = N * maxpacket + short_packet pktcnt = N + (short_packet exist ? 1 : 0)
-		if (xfer_len > ep_maxPacket) {		// currently set to 0x40
+		if (xfer_len > ep_maxPacket) {				// If the transfer is larger than the maximum packet size send the maximum size and use the remaining flag to trigger a second send
 			xfer_rem = xfer_len - ep_maxPacket;
 			xfer_len = ep_maxPacket;
 		}
@@ -709,7 +650,6 @@ void USB::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_l
 		}
 	} else { 		// OUT endpoint
 
-		// Program the transfer size and packet count as follows: pktcnt = N xfersize = N * maxpacket
 		USBx_OUTEP(endpoint)->DOEPTSIZ &= ~(USB_OTG_DOEPTSIZ_XFRSIZ);
 		USBx_OUTEP(endpoint)->DOEPTSIZ &= ~(USB_OTG_DOEPTSIZ_PKTCNT);
 
