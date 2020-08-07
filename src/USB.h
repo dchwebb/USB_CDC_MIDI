@@ -98,10 +98,7 @@ extern uint16_t usbEventNo;
 #define LOBYTE(x)  ((uint8_t)(x & 0x00FFU))
 #define HIBYTE(x)  ((uint8_t)((x & 0xFF00U) >> 8U))
 
-#define DIR_IN true
-#define DIR_OUT false
-
-struct usbRequest {
+/*struct usbRequest {
 	uint8_t mRequest;
 	uint8_t Request;
 	uint16_t Value;
@@ -115,27 +112,11 @@ struct usbRequest {
 		Index = (uint16_t)(data[4]) + (data[5] << 8);
 		Length = (uint16_t)(data[6]) + (data[7] << 8);
 	}
-};
-
-struct USBD_CDC_LineCodingTypeDef {
-	uint32_t bitrate;    				// Data terminal rate in bits per sec.
-	uint8_t format;      				// Stop Bits: 0-1 Stop Bit; 1-1.5 Stop Bits; 2-2 Stop Bits
-	uint8_t paritytype;  				// Parity: 0 = None; 1 = Odd; 2 = Even; 3 = Mark; 4 = Space; 6 bDataBits 1 Data bits
-	uint8_t datatype;    				// Data bits (5, 6, 7,	8 or 16)
-};
+};*/
 
 #define USB_DEBUG_COUNT 400
 
-struct usbDebugItem {
-	uint16_t eventNo;
-	uint32_t Interrupt;
-	uint32_t IntData;
-	usbRequest Request;
-	uint8_t endpoint;
-	uint16_t PacketSize;
-	uint32_t xferBuff0;
-	uint32_t xferBuff1;
-};
+
 
 
 class USB {
@@ -147,38 +128,58 @@ public:
 	std::function<void(uint8_t*,uint32_t)> cdcDataHandler;			// Declare data handler to store incoming CDC data
 	std::function<void(uint8_t*,uint32_t)> midiDataHandler;		// Declare data handler to store incoming midi data
 
-	usbDebugItem usbDebug[USB_DEBUG_COUNT];
 	uint16_t usbDebugNo = 0;
 	uint16_t usbDebugEvent = 0;
 
 	enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, MIDI_In = 0x83, MIDI_Out = 0x3};
-
+	enum class Direction {in, out};
 private:
-	void USB_ActivateEndpoint(uint8_t endpoint, bool is_in, uint8_t eptype);
+	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, uint8_t eptype);
 	void USB_ReadPacket(const uint32_t* dest, uint16_t len);
 	void USB_WritePacket(const uint8_t* src, uint8_t endpoint, uint16_t len);
-	void USBD_GetDescriptor(usbRequest req);
-	void USBD_StdDevReq (usbRequest req);
-	void USB_EPStartXfer(bool is_in, uint8_t endpoint, uint32_t xfer_len);
+	void USBD_GetDescriptor();
+	void USBD_StdDevReq();
+	void USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len);
 	void USBD_CtlError();
 	bool USB_ReadInterrupts(uint32_t interrupt);
 	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
 	uint32_t USBD_GetString(const uint8_t* desc, uint8_t* unicode);
 
-	usbRequest req;
+	//usbRequest req;
 	const uint8_t ep_maxPacket = 0x40;
-	uint32_t xfer_buff[64];		// in HAL there is a transfer buffer for each in and out endpoint
+	uint32_t xfer_buff[64];			// in HAL there is a transfer buffer for each in and out endpoint
 	uint32_t xfer_count;
-	uint32_t xfer_rem;			// If transfer is larger than maximum packet size store remaining byte count
+	uint32_t xfer_rem;				// If transfer is larger than maximum packet size store remaining byte count
 	const uint8_t* outBuff;
 	uint32_t outBuffSize;
 	uint32_t outCount;
 	uint32_t ep0_state;
 	uint8_t dev_state;
-	uint8_t CmdOpCode;			// stores class specific operation codes (eg CDC set line config)
+	uint8_t CmdOpCode;				// stores class specific operation codes (eg CDC set line config)
 	bool transmitting;
 
-	USBD_CDC_LineCodingTypeDef USBD_CDC_LineCoding;
+	struct usbRequest {
+		uint8_t mRequest;
+		uint8_t Request;
+		uint16_t Value;
+		uint16_t Index;
+		uint16_t Length;
+
+		void loadData(const uint8_t* data) {
+			mRequest = data[0];
+			Request = data[1];
+			Value = (uint16_t)(data[2]) + (data[3] << 8);
+			Index = (uint16_t)(data[4]) + (data[5] << 8);
+			Length = (uint16_t)(data[6]) + (data[7] << 8);
+		}
+	} req;
+
+	struct USBD_CDC_LineCodingTypeDef {
+		uint32_t bitrate;    		// Data terminal rate in bits per sec.
+		uint8_t format;      		// Stop Bits: 0-1 Stop Bit; 1-1.5 Stop Bits; 2-2 Stop Bits
+		uint8_t paritytype;  		// Parity: 0 = None; 1 = Odd; 2 = Even; 3 = Mark; 4 = Space; 6 bDataBits 1 Data bits
+		uint8_t datatype;    		// Data bits (5, 6, 7,	8 or 16)
+	} USBD_CDC_LineCoding;
 
 	// USB standard device descriptor - in usbd_desc.c
 	const uint8_t USBD_FS_DeviceDesc[0x12] = {
@@ -189,7 +190,7 @@ private:
 			0xEF,					// bDeviceClass: (Miscellaneous)
 			0x02,					// bDeviceSubClass (Interface Association Descriptor- with below)
 			0x01,					// bDeviceProtocol (Interface Association Descriptor)
-			64,  					// bMaxPacketSize
+			ep_maxPacket,  			// bMaxPacketSize
 			LOBYTE(USBD_VID),		// idVendor
 			HIBYTE(USBD_VID),		// idVendor
 			LOBYTE(USBD_PID_FS),	// idProduct
@@ -431,4 +432,16 @@ private:
 
 	uint8_t USBD_StrDesc[128];
 
+public:
+	struct usbDebugItem {
+		uint16_t eventNo;
+		uint32_t Interrupt;
+		uint32_t IntData;
+		usbRequest Request;
+		uint8_t endpoint;
+		uint16_t PacketSize;
+		uint32_t xferBuff0;
+		uint32_t xferBuff1;
+	};
+	usbDebugItem usbDebug[USB_DEBUG_COUNT];
 };
