@@ -7,11 +7,6 @@
 
 USB usb;
 
-
-uint8_t midiEventRead = 0;
-uint8_t midiEventWrite = 0;
-uint8_t eventOcc = 0;
-uint16_t noteOnTest = 0;
 volatile uint32_t SysTickVal;
 
 bool noteDown = false;
@@ -37,8 +32,7 @@ extern "C" {
 
 
 
-void dumpArray() {		//std::string loopback
-	//usb.SendData((uint8_t*)loopback.c_str(), loopback.length());
+void dumpArray() {
 
 	uartSendStr("Event,Interrupt,Int Data,Endpoint,mRequest,Request,Value,Index,Length,PacketSize,XferBuff0,XferBuff1\n");
 	uint16_t evNo = usb.usbDebugEvent % USB_DEBUG_COUNT;

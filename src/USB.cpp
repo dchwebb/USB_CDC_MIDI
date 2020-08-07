@@ -467,7 +467,7 @@ void USB::USBD_GetDescriptor() {
 			outBuff = USBD_StrDesc;
 			break;
 		case USBD_IDX_PRODUCT_STR:			// 302
-			outBuffSize = USBD_GetString((uint8_t*)USBD_PRODUCT_STRING_FS, USBD_StrDesc);
+			outBuffSize = USBD_GetString((uint8_t*)USBD_PRODUCT_STRING, USBD_StrDesc);
 			outBuff = USBD_StrDesc;
 			break;
 		case USBD_IDX_SERIAL_STR:			// 303
@@ -486,13 +486,13 @@ void USB::USBD_GetDescriptor() {
 				outBuffSize = sizeof(USBD_StringSerial);
 			}
 			break;
-	    case USBD_IDX_CONFIG_STR:			// 304
-			outBuffSize = USBD_GetString((uint8_t*)USBD_CONFIG_FS, USBD_StrDesc);
+	    case USBD_IDX_MIDI_STR:				// 304
+			outBuffSize = USBD_GetString((uint8_t*)USBD_MIDI_STRING, USBD_StrDesc);
 			outBuff = USBD_StrDesc;
 	      break;
 
-	    case USBD_IDX_INTERFACE_STR:		// 305
-			outBuffSize = USBD_GetString((uint8_t*)USBD_INTERFACE_STRING, USBD_StrDesc);
+	    case USBD_IDX_CDC_STR:				// 305
+			outBuffSize = USBD_GetString((uint8_t*)USBD_CDC_STRING, USBD_StrDesc);
 			outBuff = USBD_StrDesc;
 	      break;
 

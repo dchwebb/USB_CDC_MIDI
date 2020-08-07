@@ -114,12 +114,12 @@ function onMIDISuccess(midiAccess) {
 
     for (var input of midiAccess.inputs.values()) {
         console.log(input.name);
-        if (input.name == "Mountjoy MIDI2") {
+        if (input.name == "Mountjoy MIDI") {
             input.onmidimessage = getMIDIMessage;
         }
     }
     for (var out of midiAccess.outputs.values()) {
-        if (out.name == "Mountjoy MIDI2") {
+        if (out.name == "Mountjoy MIDI") {
             output = out;
         }
     }

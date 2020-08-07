@@ -3,8 +3,6 @@
 #include "initialisation.h"
 #include <functional>
 
-//extern uint8_t eventOcc, reqEventNo, midiEventNo, midiEventRead, midiEventWrite;
-extern uint16_t usbEventNo;
 
 // USB Definitions
 #define USBx_PCGCCTL	 *(__IO uint32_t *)(USB_OTG_FS_PERIPH_BASE + USB_OTG_PCGCCTL_BASE)
@@ -45,12 +43,7 @@ extern uint16_t usbEventNo;
 #define USB_REQ_GET_CONFIGURATION		0x08U
 #define USB_REQ_SET_CONFIGURATION		0x09U
 
-#define USBD_IDX_LANGID_STR				0x00U
-#define USBD_IDX_MFC_STR				0x01U
-#define USBD_IDX_PRODUCT_STR			0x02U
-#define USBD_IDX_SERIAL_STR				0x03U
-#define USBD_IDX_CONFIG_STR				0x04U
-#define USBD_IDX_INTERFACE_STR			0x05U
+
 
 #define USB_DESC_TYPE_DEVICE			0x01U
 #define USB_DESC_TYPE_CONFIGURATION		0x02U
@@ -82,42 +75,29 @@ extern uint16_t usbEventNo;
 #define USBD_STATE_CONFIGURED			0x03U
 #define USBD_STATE_SUSPENDED			0x04U
 
+#define USBD_IDX_LANGID_STR				0x00U
+#define USBD_IDX_MFC_STR				0x01U
+#define USBD_IDX_PRODUCT_STR			0x02U
+#define USBD_IDX_SERIAL_STR				0x03U
+#define USBD_IDX_MIDI_STR				0x04U
+#define USBD_IDX_CDC_STR				0x05U
+
 #define USBD_VID						1155
 #define USBD_LANGID_STRING				1033
 #define USBD_MANUFACTURER_STRING		"Mountjoy Modular"
 #define USBD_PID_FS						22352
-#define USBD_PRODUCT_STRING_FS			"Mountjoy MIDI2"
-#define USBD_CONFIG_FS					"CDC Config"
-#define USBD_INTERFACE_STRING			"Mountjoy CDC Interface"
+#define USBD_PRODUCT_STRING				"Mountjoy MIDI"
+#define USBD_MIDI_STRING				"Mountjoy MIDI"
+#define USBD_CDC_STRING					"Mountjoy CDC Interface"
 
 #define CLASS_SPECIFIC_DESC_SIZE		50
 #define CDC_MIDI_CONFIG_DESC_SIZE		152
 #define USB_LEN_LANGID_STR_DESC			4
 
-
 #define LOBYTE(x)  ((uint8_t)(x & 0x00FFU))
 #define HIBYTE(x)  ((uint8_t)((x & 0xFF00U) >> 8U))
 
-/*struct usbRequest {
-	uint8_t mRequest;
-	uint8_t Request;
-	uint16_t Value;
-	uint16_t Index;
-	uint16_t Length;
-
-	void loadData(const uint8_t* data) {
-		mRequest = data[0];
-		Request = data[1];
-		Value = (uint16_t)(data[2]) + (data[3] << 8);
-		Index = (uint16_t)(data[4]) + (data[5] << 8);
-		Length = (uint16_t)(data[6]) + (data[7] << 8);
-	}
-};*/
-
 #define USB_DEBUG_COUNT 400
-
-
-
 
 class USB {
 public:
@@ -131,7 +111,8 @@ public:
 	uint16_t usbDebugNo = 0;
 	uint16_t usbDebugEvent = 0;
 
-	enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, MIDI_In = 0x83, MIDI_Out = 0x3};
+	//enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, MIDI_In = 0x83, MIDI_Out = 0x3};
+	enum EndPoint {MIDI_In = 0x81, MIDI_Out = 0x1, CDC_In = 0x82, CDC_Out = 0x2, CDC_Cmd = 0x83, };
 	enum class Direction {in, out};
 private:
 	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, uint8_t eptype);
@@ -228,7 +209,7 @@ private:
 			0x01,								// AUDIO
 			0x01,								// AUDIO_Control
 			0x00,								// bInterfaceProtocol
-			0x00,								// string index for interface
+			USBD_IDX_MIDI_STR,					// string index for interface
 
 			// B.3.2 Class-specific AC Interface Descriptor
 			0x09,								// sizeof(usbDescrCDC_HeaderFn): length of descriptor in bytes
@@ -250,7 +231,7 @@ private:
 			0x01,								// bInterfaceClass: Audio
 			0x03,								// bInterfaceSubClass: MIDIStreaming
 			0x00,								// InterfaceProtocol
-			0x00,								// iInterface: No String Descriptor
+			USBD_IDX_MIDI_STR,					// iInterface: No String Descriptor
 
 			// B.4.2 Class-specific MS Interface Descriptor
 			0x07,								// length of descriptor in bytes
@@ -281,7 +262,7 @@ private:
 			//B.5.1 Standard Bulk OUT Endpoint Descriptor
 			0x09,								// bLength
 			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType = endpoint
-			MIDI_Out,						// bEndpointAddress OUT endpoint number 2
+			MIDI_Out,							// bEndpointAddress
 			0x02,								// bmAttributes: 2:Bulk, 3:Interrupt endpoint
 			0x40, 0X00,							// wMaxPacketSize 64 bytes per packet.
 			0x00,								// bInterval in ms : ignored for bulk
@@ -321,7 +302,7 @@ private:
 			0x02,								// bFunctionClass (Communications and CDC Control)
 			0x02,								// bFunctionSubClass
 			0x01,								// bFunctionProtocol
-			USBD_IDX_INTERFACE_STR,				// iFunction (String Descriptor 6)
+			USBD_IDX_CDC_STR,					// iFunction (String Descriptor 6)
 
 			// Interface Descriptor
 			0x09,								// bLength: Interface Descriptor size
@@ -332,7 +313,7 @@ private:
 			0x02,								// bInterfaceClass: Communication Interface Class
 			0x02,								// bInterfaceSubClass: Abstract Control Model
 			0x01,								// bInterfaceProtocol: Common AT commands
-			USBD_IDX_INTERFACE_STR,				// iInterface
+			USBD_IDX_CDC_STR,					// iInterface
 
 			// Header Functional Descriptor
 			0x05,								// bLength: Endpoint Descriptor size
