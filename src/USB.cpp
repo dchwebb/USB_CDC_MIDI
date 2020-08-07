@@ -202,12 +202,23 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 							//USB_EPSetStall(epnum);
 						}
 					} else {
+						if (ep0_state == USBD_EP0_DATA_IN) {
+							if (xfer_rem > 0) {
+								outBuffSize = xfer_rem;
+								xfer_rem = 0;
+
+								usbDebug[usbDebugNo].PacketSize = outBuffSize;
+								usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
+								usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
+
+								USB_EPStartXfer(Direction::in, epnum, outBuffSize);
+							}
+						}
 						transmitting = false;
 					}
 				}
 
 				if ((epint & USB_OTG_DIEPINT_TXFE) == USB_OTG_DIEPINT_TXFE) {				// 0x80 Transmit FIFO empty
-					//uint32_t maxPacket = (epnum == 0 ? ep_maxPacket : ep_maxPacket);
 
 					usbDebug[usbDebugNo].PacketSize = outBuffSize;
 					usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
@@ -223,46 +234,41 @@ void USB::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f
 					outBuff += outBuffSize;		// Move pointer forwards
 					uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MASK));
 					USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
+/*
+					//------------------------------------------------------
+					// from PCD_WriteEmptyTxFifo
+					uint32_t len = outBuffSize;
+					if (len > ep_maxPacket)
+						len = ep_maxPacket;
 
+					uint32_t len32b = (len + 3U) / 4U;
 
-/*	// from PCD_WriteEmptyTxFifo
- 	len = ep->xfer_len - ep->xfer_count;
+					while ((USBx_INEP(epnum)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV) >= len32b && outBuffSize > 0) {
+						//Write the FIFO
+						len = outBuffSize;
 
-	if (len > ep->maxpacket)
-	{
-		len = ep->maxpacket;
-	}
+						if (len > ep_maxPacket)
+							len = ep_maxPacket;
 
-	len32b = (len + 3U) / 4U;
-
-  				while (((USBx_INEP(epnum)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV) >= len32b) &&
-							(ep->xfer_count < ep->xfer_len) && (ep->xfer_len != 0U))
-					{
-						 Write the FIFO
-						len = ep->xfer_len - ep->xfer_count;
-
-						if (len > ep->maxpacket)
-						{
-							len = ep->maxpacket;
-						}
 						len32b = (len + 3U) / 4U;
 
-						usbDebug[usbEventNo].PacketSize = ep->xfer_len;
-						usbDebug[usbEventNo].xferBuff0 = ((uint32_t*)ep->xfer_buff)[0];
-						usbDebug[usbEventNo].xferBuff1 = ((uint32_t*)ep->xfer_buff)[1];
+						usbDebug[usbDebugNo].PacketSize = len;
+						usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
+						usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
 
-						(void)USB_WritePacket(USBx, ep->xfer_buff, (uint8_t)epnum, (uint16_t)len,
-								(uint8_t)hpcd->Init.dma_enable);
+						//(void)USB_WritePacket(USBx, ep->xfer_buff, (uint8_t)epnum, (uint16_t)len, (uint8_t)hpcd->Init.dma_enable);
+						USB_WritePacket(outBuff, epnum, len);
 
-						ep->xfer_buff  += len;
-						ep->xfer_count += len;
+						outBuff += len;
+						outBuffSize -= len;
 					}
 
-					if (ep->xfer_len <= ep->xfer_count)
-					{
-						fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MASK));
+					if (outBuffSize == 0) {
+						uint32_t fifoemptymsk = (uint32_t)(0x1UL << (epnum & EP_ADDR_MASK));
 						USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
-					}*/
+					}
+*/
+					//------------------------------------------------------
 				}
 
 				if ((epint & USB_OTG_DIEPINT_TOC) == USB_OTG_DIEPINT_TOC) {					// Timeout condition
@@ -688,7 +694,7 @@ void USB::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_l
 		USBx_INEP(endpoint)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_XFRSIZ);
 
 		// Program the transfer size and packet count as follows: xfersize = N * maxpacket + short_packet pktcnt = N + (short_packet exist ? 1 : 0)
-		if (xfer_len > ep_maxPacket && endpoint == 0) {		// currently set to 0x40
+		if (xfer_len > ep_maxPacket) {		// currently set to 0x40
 			xfer_rem = xfer_len - ep_maxPacket;
 			xfer_len = ep_maxPacket;
 		}
@@ -738,6 +744,7 @@ void USB::SendData(const uint8_t* data, uint16_t len, uint8_t endpoint) {
 			transmitting = true;
 			outBuff = (uint8_t*)data;
 			outBuffSize = len;
+			ep0_state = USBD_EP0_DATA_IN;
 			USB_EPStartXfer(Direction::in, endpoint, len);
 		}
 	}
