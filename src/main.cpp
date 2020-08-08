@@ -29,33 +29,6 @@ extern "C" {
 }
 
 
-
-
-
-void dumpArray() {
-
-	uartSendStr("Event,Interrupt,Int Data,Endpoint,mRequest,Request,Value,Index,Length,PacketSize,XferBuff0,XferBuff1\n");
-	uint16_t evNo = usb.usbDebugEvent % USB_DEBUG_COUNT;
-
-	for (int i = 0; i < USB_DEBUG_COUNT; ++i) {
-		if (usb.usbDebug[evNo].Interrupt != 0) {
-			uartSendStr(IntToString(usb.usbDebug[evNo].eventNo) + ","
-					+ HexToString(usb.usbDebug[evNo].Interrupt, false) + ","
-					+ HexToString(usb.usbDebug[evNo].IntData, false) + ","
-					+ IntToString(usb.usbDebug[evNo].endpoint) + ","
-					+ HexByte(usb.usbDebug[evNo].Request.mRequest) + ", "
-					+ HexByte(usb.usbDebug[evNo].Request.Request) + ", "
-					+ HexByte(usb.usbDebug[evNo].Request.Value) + ", "
-					+ HexByte(usb.usbDebug[evNo].Request.Index) + ", "
-					+ HexByte(usb.usbDebug[evNo].Request.Length) + ", "
-					+ HexByte(usb.usbDebug[evNo].PacketSize) + ", "
-					+ HexToString(usb.usbDebug[evNo].xferBuff0, false) + ", "
-					+ HexToString(usb.usbDebug[evNo].xferBuff1, false) + "\n");
-		}
-		evNo = (evNo + 1) % USB_DEBUG_COUNT;
-	}
-}
-
 void usbSerialdata(uint8_t* datain, uint32_t size) {
 	uartSendStr(IntToString(size) + ":" + std::string((char*)datain, size) + "\n");
 }
@@ -88,7 +61,9 @@ int main(void)
 		if (GPIOC->IDR & GPIO_IDR_ID13 && !dumped) {
 			GPIOB->ODR |= GPIO_ODR_OD7;
 			dumped = true;
-			dumpArray();
+#if (USB_DEBUG)
+			usb.OutputDebug();
+#endif
 		} else {
 			GPIOB->ODR &= ~GPIO_ODR_OD7;
 			dumped = false;

@@ -3,6 +3,13 @@
 #include "initialisation.h"
 #include <functional>
 
+// Enables capturing of debug data for output over STLink UART on dev boards
+#define USB_DEBUG false
+#if (USB_DEBUG)
+#include "uartHandler.h"
+#define USB_DEBUG_COUNT 400
+#endif
+
 
 // USB Definitions
 #define USBx_PCGCCTL	 *(__IO uint32_t *)(USB_OTG_FS_PERIPH_BASE + USB_OTG_PCGCCTL_BASE)
@@ -10,7 +17,6 @@
 #define USBx_INEP(i)	 ((USB_OTG_INEndpointTypeDef *)(USB_OTG_FS_PERIPH_BASE + USB_OTG_IN_ENDPOINT_BASE + ((i) * USB_OTG_EP_REG_SIZE)))
 #define USBx_OUTEP(i)	((USB_OTG_OUTEndpointTypeDef *)(USB_OTG_FS_PERIPH_BASE + USB_OTG_OUT_ENDPOINT_BASE + ((i) * USB_OTG_EP_REG_SIZE)))
 #define USBx_DFIFO(i)	*(uint32_t*)(USB_OTG_FS_PERIPH_BASE + USB_OTG_FIFO_BASE + ((i) * USB_OTG_FIFO_SIZE))
-
 
 // USB Transfer status definitions
 #define STS_GOUT_NAK					1U
@@ -97,8 +103,6 @@
 #define LOBYTE(x)  ((uint8_t)(x & 0x00FFU))
 #define HIBYTE(x)  ((uint8_t)((x & 0xFF00U) >> 8U))
 
-#define USB_DEBUG_COUNT 400
-
 class USB {
 public:
 	void USBInterruptHandler();
@@ -108,10 +112,6 @@ public:
 	std::function<void(uint8_t*,uint32_t)> cdcDataHandler;			// Declare data handler to store incoming CDC data
 	std::function<void(uint8_t*,uint32_t)> midiDataHandler;		// Declare data handler to store incoming midi data
 
-	uint16_t usbDebugNo = 0;
-	uint16_t usbDebugEvent = 0;
-
-	//enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, MIDI_In = 0x83, MIDI_Out = 0x3};
 	enum EndPoint {MIDI_In = 0x81, MIDI_Out = 0x1, CDC_In = 0x82, CDC_Out = 0x2, CDC_Cmd = 0x83, };
 	enum class Direction {in, out};
 private:
@@ -414,6 +414,10 @@ private:
 	uint8_t USBD_StrDesc[128];
 
 public:
+#if (USB_DEBUG)
+	uint16_t usbDebugNo = 0;
+	uint16_t usbDebugEvent = 0;
+
 	struct usbDebugItem {
 		uint16_t eventNo;
 		uint32_t Interrupt;
@@ -425,4 +429,6 @@ public:
 		uint32_t xferBuff1;
 	};
 	usbDebugItem usbDebug[USB_DEBUG_COUNT];
+	void OutputDebug();
+#endif
 };
